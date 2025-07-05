@@ -1,62 +1,115 @@
-# AD-MPC: Fully Asynchronous Dynamic MPC with Guaranteed Output Delivery. 
+# AD-MPC: Asynchronous Dynamic MPC with Guaranteed Output Delivery
 
-<!-- ## Running on local machine
+Asynchronous Dynamic MPC (AD‑MPC) extends dynamic MPC protocols to fully asynchronous networks while guaranteeing output delivery (GOD) under the optimal resilience threshold (n = 3t + 1). This repository contains an implementation of AD‑MPC.
 
-### Required tools
-1. Install `Docker`_. (For Linux, see `Manage Docker as a non-root user`_) to
-run ``docker`` without ``sudo``.)
+## Setup
 
-2. Install `docker-compose`
+1. Ensure that [Docker](https://docs.docker.com/) is installed and the daemon is running.
 
-### Building
+2. Move into the project root:
+   ```bash
+   cd AD-MPC
+   ```
 
-1. The image will need to be built  (this will likely take a while). Inside the `htadkg` folder run
+3. Build the Docker image:
+   ```bash
+   docker build -t admpc:latest .
+   ```
+   > **Note:** If you are on macOS with Apple Silicon (M‑series) and need an `arm64` image, you can instead run  
+   > ```bash
+   > docker buildx build --platform=linux/arm64 -t admpc:arm64 .
+   > ```
+
+
+## Running AD‑MPC locally
+
+The helper script `local_admpc_run.sh` spins up one process per **node × layer** (or per node for HoneyBadgerMPC) on the same machine and writes all stdout/stderr to `logs/`.  
+Below are several one‑line commands to run common local experiments.
+
+1. **Enter a container (if not already inside one)**  
+   ```bash
+   docker run -it admpc:latest bash
+   ```
+
+2. **Quick start – AD‑MPC**  
+   ```bash
+   ./local_admpc_run.sh admpc 4 1 8 300
+   ```  
+   This launches 4 nodes with fault threshold 1 on an 8‑layer circuit containing 300 multiplication gates.  
+   Timing results are aggregated into `extracted_times.csv` and `summary_times.csv`; per‑process logs appear under `logs/`.
+
+3. **Fluid‑MPC baselines**  
+   ```bash
+   ./local_admpc_run.sh fluid1 4 1 10 300   # Fluid MPC (variant 1)
+   ./local_admpc_run.sh fluid2 4 1 10 300   # Fluid MPC (variant 2)
+   ```  
+   Output is recorded in `logs/` as above.
+
+4. **HoneyBadger‑MPC baseline & attack scenario**  
+   ```bash
+   # Honest execution
+   ./local_admpc_run.sh hbmpc 4 1 6 300
+
+   # Simulate an honest node going offline (e.g., at layer 3)
+   ./local_admpc_run.sh hbmpc_attack 4 1 6 300
+   ```  
+   Output is recorded in `logs/` as above.
+## Distributed deployment on Tencent Cloud
+
+All orchestration commands are run **inside a local container** so your host machine only needs Docker and SSH.
+
+```bash
+# On your local machine
+docker run -it admpc:latest bash
 ```
-$ docker-compose build adkg
+
+### 1. Provision servers & security groups
+
+* Launch one Tencent Cloud CVM for **each committee member in every circuit layer** (i.e., `layers × N` instances).  
+* Open the required ports (TCP 7001‑7013, 22, ICMP/ICMPv6, etc.) with the helper script:
+
+```bash
+python scripts/apply_security_group.py   # edit SecretId / SecretKey first
 ```
 
-### Running tests
+### 2. Register node IPs
 
-1. You need to start a shell session in a container. The first run will take longer if the docker image hasn't already been built:
+Edit the arrays `NODE_IPS` and `NODE_NUM` in  
+`scripts/config.sh`, `scripts/setup_ssh_keys.sh`, and `scripts/create_json_files.sh`.
+
+### 3. Generate node configuration files
+
+```bash
+cd scripts
+
+# w = 100, vary circuit depth d ∈ {2,4,6,8,10}
+./batch_create_d.sh
+
+# Sweep N‑t pairs (layers=8, total_cm=300)
+./batch_create_json.sh
+
+# Experiments with fixed product w·d ∈ {600, 960, 1200}
+./batch_create_wd.sh
 ```
-$ docker-compose run --rm adkg bash
+
+### 4. Configure password‑less SSH
+
+```bash
+./setup_ssh_keys.sh
 ```
 
-2. Then, to test the `adkg` code locally, i.e., multiple thread in a single docker container, you need to run the following command with parameters:
-      - `num`: Number of nodes, 
-      - `ths`: fault-tolerance threshold, and 
-      - `deg`: Degree of the ADKG polynomial. 
+### 5. Distribute code & Docker image
 
-   Note that `n>3*t` and `deg < n-t`
+```bash
+./distribute-docker.sh
 ```
-$ pytest tests/test_adkg.py -o log_cli=true --num 4 --ths 1 --deg 2 --curve ed25519
+
+### 6. Launch the protocol
+
+```bash
+./control-node.sh <config_dir> [protocol] 
 ```
- 
-## Running locally on multiple processes within a docker image
 
-Note: Required tools and build instructions are same as above
-
-### Running tests
-1. Start a docker image by running
-```$docker-compose run --rm adkg bash ```
-
-2. Start the ADKG instances
-```$sh scripts/launch-tmuxlocal.sh scripts/adkg-tutorial.py [NUM_NODES]```
-
-For this basic test, by default our artifact supports 16, 32, and 64 nodes. To evaluate with arbitrary `num,ths` and `deg`, first, generate the corresponding configuration files using `gen_config.py`. We recommend testing with 16 and 32 nodes for quicker results.
-
-NOTE: Although this process runs `NUM_NODES` number of ADKG nodes, our artifact only displays the log of the first four nodes. All remaining logs are available at `dump.log`.
-
-## Running in AWS instances
-Please refer to `aws/README.md` for detailed information on how to run the protocol using amazon web services
-
-
-To cite:
-```
-@inproceedings{das2023practical,
-   title={Practical Asynchronous High-threshold Distributed Key Generation and Distributed Polynomial Sampling},
-   author={Das, Sourav and Xiang, Zhuolun and Kokoris-Kogias, Lefteris and Ren, Ling},
-   booktitle={31st USENIX Security Symposium (USENIX Security 23)},
-   year={2023}
-}
-``` -->
+`config_dir` is the folder generated by the batch scripts (e.g., `admpc_300_6_16`).  
+If the remote servers do not yet have the AD‑MPC Docker image, the script automatically triggers a build via `docker-compose` before starting the containers.  
+Output is streamed back to `scripts/logs/` on your local machine.
