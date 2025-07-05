@@ -1,0 +1,14 @@
+my_send_id: 2
+2025-07-05 07:20:00,090:[honeybadgermpc_run.py:60]:[INFO]: hbMPC start time: 1751700000.0900373
+cm: 50 layers: 2
+my id: 2 RAND protocol total time: 7.0563 seconds
+my id: 2 APREP protocol total time: 36.1680 seconds
+prepare mult_triples time: 36.168593883514404
+my id: 2 RAND protocol total time: 1.9309 seconds
+prepare new shares time: 1.9311537742614746
+len inputs: 200 len gate_tape: 100 len mult: 100
+layer ID: 0 layer_time: 0.026329517364501953
+len inputs: 200 len gate_tape: 100 len mult: 100
+layer ID: 1 layer_time: 0.024311542510986328
+honeybadgermpc_time: 38.19188594818115
+my_send_id: 2 exec_time: 38.19537663459778
